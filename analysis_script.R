@@ -22,9 +22,9 @@ cleaned_data <- numeric_data %>%
                       # create variables for whether respondents got a pre-reg cue or read prereg
                       mutate(prereg_cue = case_when(quality == 'high' | quality == 'low' ~ 'yes',
                                                     quality == 'none' ~ 'no'),
-                             read_prerep = case_when((quality == 'high' | quality == 'low') & prereg_read == 2 ~ 'yes',
+                             read_prereg = case_when((quality == 'high' | quality == 'low') & prereg_read == 2 ~ 'yes',
                                                      (quality == 'high' | quality == 'low') & (prereg_read == 1 | is.na(prereg_read)) ~ 'no')) %>%
-                      filter(failed_manipulation_check == 0)  # remove those who failed manipulation check
+                      filter(failed_manipulation_check == 'no')  # remove those who failed manipulation check
                       
 ## basic descriptives
 
