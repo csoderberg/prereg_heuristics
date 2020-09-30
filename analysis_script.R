@@ -21,4 +21,17 @@ cleaned_data <- numeric_data %>%
                                                       career_level == 6 ~ 3)) %>%
                       filter(failed_manipulation_check == 0) # remove those who failed manipulation check
 
+## basic descriptives
 
+# how many in each group opened pre-reg link
+cleaned_data %>%
+  filter(quality == 'high' | quality == 'low') %>%
+  group_by(quality, prereg_link) %>%
+  tally()
+
+# 
+cleaned_data %>%
+  filter(quality == 'high' | quality == 'low') %>%
+  filter(!is.na(prereg_quality)) %>%
+  group_by(quality) %>%
+  summarise(mean = mean(affect_results, na.rm = T), sd = sd(affect_results, na.rm = T), n= n())
