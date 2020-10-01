@@ -28,7 +28,9 @@ numeric_data <- numeric_data %>%
 
 cleaned_data <- numeric_data %>%
                   filter(failed_manipulation_check == 'no') %>%  # remove those who failed manipulation check
-                  filter(participant_id != 24444 & participant_id != 27200) # remove 2nd and 3rd time individual subject was erroneasly able ot take survey 3 times
+                  filter(participant_id != 24444 & participant_id != 27200) %>% # remove 2nd and 3rd time individual subject was erroneasly able ot take survey 3 times
+                  mutate(quality = as.factor(quality),
+                         quality = fct_relevel(quality, c('none', 'low', 'high')))
                   
 ## basic descriptives
 
