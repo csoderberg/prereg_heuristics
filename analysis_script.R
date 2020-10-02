@@ -1,7 +1,9 @@
 # load libraries
 library(tidyverse)
 library(osfr)
-library(BayesFactor)
+library(brms)
+library(bayestestR)
+library(emmeans)
 
 # download and read in data
 osf_retrieve_file('hxbe5') %>%
@@ -30,7 +32,15 @@ cleaned_data <- numeric_data %>%
                   filter(failed_manipulation_check == 'no') %>%  # remove those who failed manipulation check
                   filter(participant_id != 24444 & participant_id != 27200) %>% # remove 2nd and 3rd time individual subject was erroneasly able ot take survey 3 times
                   mutate(quality = as.factor(quality),
-                         quality = fct_relevel(quality, c('none', 'low', 'high')))
+                         quality = fct_relevel(quality, c('none', 'low', 'high')),
+                         vignette = as.factor(vignette),
+                         career_stage = as.factor(career_stage))
+
+prereg_cued_data <- cleaned_data %>%
+  filter(prereg_cue == 'yes')
+
+write_csv(cleaned_data, 'cleaned_data.csv')
+write_csv(cleaned_data %>% filter(prereg_cue == 'yes'), 'cleaned_data_no_none.csv')
                   
 ## basic descriptives
 
@@ -47,11 +57,62 @@ cleaned_data %>%
 
 # of those who opened, how many read?
 cleaned_data %>%
-  filter(prereg_link == 2) %>%
-  group_by(prereg_read) %>%
+  filter((quality == 'high' | quality == 'low') & prereg_link == 2) %>%
+  group_by(quality, prereg_read) %>%
   tally()
 
 ## Pre-registered Analyses
 
-### Primary RQ1
-test <- anovaBF(study_credibility ~ quality, data = cleaned_data %>% filter(!is.na(study_credibility)) %>% mutate(quality = as.factor(quality)))
+contrasts(cleaned_data$quality) <- contr.bayes
+contrasts(cleaned_data$vignette) <- contr.bayes
+contrasts(cleaned_data$career_stage) <- contr.bayes
+
+### Primary RQs
+
+# set up overall model (with default priors from JASP)
+m0 <- brm(study_credibility ~ vignette + career_stage, data = cleaned_data, save_all_pars = TRUE, prior = c(set_prior("normal(0,.354)", class = "b", coef = "career_stage1"),
+                                                                                                            set_prior("normal(0,.354)", class = "b", coef = "career_stage2"),
+                                                                                                            set_prior("normal(0,.354)", class = "b", coef = "vignette1"),
+                                                                                                            set_prior("normal(0,.354)", class = "b", coef = "vignette2"),
+                                                                                                            set_prior("normal(0, .5)", class = "Intercept"),
+                                                                                                            set_prior("normal(0,1)", "sigma")))
+m1 <- brm(study_credibility ~ vignette + career_stage + quality, data = cleaned_data, save_all_pars = TRUE, prior = c(set_prior("normal(0,.354)", "b", "career_stage1"),
+                                                                                                                      set_prior("normal(0,.354)", "b", "career_stage2"),
+                                                                                                                      set_prior("normal(0,.354)", "b", "vignette1"),
+                                                                                                                      set_prior("normal(0,.354)", "b", "vignette2"),
+                                                                                                                      set_prior("normal(0,.5)", "b", "quality1"),
+                                                                                                                      set_prior("normal(0,.5)", "b", "quality2"),
+                                                                                                                      set_prior("normal(0, .5)", class = "Intercept"),
+                                                                                                                      set_prior("normal(0,1)", "sigma")))
+comparison <- bayesfactor_models(m1, denominator = m0)
+comparison
+
+# set up pairwise contrasts
+quality_levels <- emmeans(m1, ~quality)
+quality_diff <- pairs(quality_levels)
+quality_all <- rbind(quality_levels, quality_diff)
+
+bayesfactor_parameters(quality_all, prior = m1, direction = "two-sided")
+
+### Secondary RQ1
+
+contrasts(prereg_cued_data$vignette) <- contr.bayes
+contrasts(prereg_cued_data$career_stage) <- contr.bayes
+
+# set up overall model (with default priors from JASP)
+q2_m0 <- brm(prereg_quality ~ vignette + career_stage, data = prereg_cued_data, save_all_pars = TRUE, prior = c(set_prior("normal(0,.354)", class = "b", coef = "career_stage1"),
+                                                                                                            set_prior("normal(0,.354)", class = "b", coef = "career_stage2"),
+                                                                                                            set_prior("normal(0,.354)", class = "b", coef = "vignette1"),
+                                                                                                            set_prior("normal(0,.354)", class = "b", coef = "vignette2"),
+                                                                                                            set_prior("normal(0,.5)", "Intercept"),
+                                                                                                            set_prior("normal(0,1)", "sigma")))
+q2_m1 <- brm(prereg_quality ~ vignette + career_stage + quality, data = prereg_cued_data, save_all_pars = TRUE, prior = c(set_prior("normal(0,.354)", "b", "career_stage1"),
+                                                                                                                      set_prior("normal(0,.354)", "b", "career_stage2"),
+                                                                                                                      set_prior("normal(0,.354)", "b", "vignette1"),
+                                                                                                                      set_prior("normal(0,.354)", "b", "vignette2"),
+                                                                                                                      set_prior("normal(0,.5)", "b", "qualityhigh"),
+                                                                                                                      set_prior("normal(0,.5)", "Intercept"),
+                                                                                                                      set_prior("normal(0,1)", "sigma")))
+
+q2_comparison <- bayesfactor_models(q2_m1, denominator = q2_m0)
+q2_comparison
